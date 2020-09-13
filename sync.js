@@ -1,5 +1,3 @@
-const { v4: uuidv4 } = require("uuid");
-
 const IPFS = require("ipfs");
 const OrbitDB = require("orbit-db");
 var fs = require("fs-extra");
@@ -12,7 +10,7 @@ let db;
 async function upsertFile(root, name, contents) {
   name = `/${root}/${name}`;
 
-  const id = uuidv4();
+  const id = name;
   const uploadPath = `/upload/${id}`;
 
   await ipfs.files.write(uploadPath, contents, { create: true, parents: true });
