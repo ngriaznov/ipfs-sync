@@ -9,7 +9,7 @@ let ipfs;
 
 async function upsertFile(name, contents) {
   const id = uuidv4();
-  const uploadPath = `/tmp/${id}`;
+  const uploadPath = `/upload/${id}`;
   await ipfs.files.write(uploadPath, contents, { create: true, parents: true });
   try {
     await ipfs.files.stat(name);
@@ -17,14 +17,14 @@ async function upsertFile(name, contents) {
   } catch {
   }
 
-  await ipfs.files.cp(uploadPath, name);
+  await ipfs.files.cp(uploadPath, name, { parents: true });
   await ipfs.files.rm(uploadPath);
 
   const rstats = await ipfs.files.stat('/');
   console.log(rstats.cid.string);
 }
 
-async function deleteFile(ipfs, name) {
+async function deleteFile(name) {
   await ipfs.files.rm(name);
 }
 
@@ -35,6 +35,12 @@ async function initIpfs(directory) {
 
   const root = path.basename(directory);
   const stats = await ipfs.files.stat('/');
+  const files = await ipfs.files.ls('/');
+
+  for await (const file of files) {
+    await ipfs.files.rm(`/${file.name}`, { recursive: true });
+  }
+
   console.log(stats.cid.string);
 
   chokidar.watch(directory).on("add", async (filePath) => {
