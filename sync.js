@@ -23,7 +23,9 @@ async function upsertFile(root, name, contents) {
   await ipfs.files.rm(uploadPath);
 
   const rstats = await ipfs.files.stat("/");
-  console.log(rstats.cid.string);
+  const fstats = await ipfs.files.stat(name);
+  console.log(`Root hash: ${rstats.cid.string}`);
+  console.log(`File hash: ${fstats.cid.string}`);
   await db.put(root, rstats.cid.string);
 }
 
