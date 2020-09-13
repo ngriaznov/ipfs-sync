@@ -22,19 +22,26 @@ async function upsertFile(root, name, contents) {
   await ipfs.files.cp(uploadPath, name, { parents: true });
   await ipfs.files.rm(uploadPath);
 
-  const rstats = await ipfs.files.stat("/");
-  const fstats = await ipfs.files.stat(name);
-  console.log(`Root hash: ${rstats.cid.string}`);
-  console.log(`File hash: ${fstats.cid.string}`);
-  await db.put(root, rstats.cid.string);
+  await updateRootHash(root);
 }
 
 async function deleteFile(root, name) {
   await ipfs.files.rm(name);
-  const rstats = await ipfs.files.stat("/");
+  await updateRootHash(root);
+}
 
-  console.log(rstats.cid.string);
-  await db.put(root, rstats.cid.string);
+async function updateRootHash(root) {
+    const rstats = await ipfs.files.stat("/");
+    console.log(`Root hash: ${rstats.cid.string}`);
+    let storage = await db.get('distribution');
+    if (!storage) {
+        storage = [];
+    }
+    storage[root] = rstats.cid.string;
+    await db.put({
+        _id: 'distribution',
+        entries: storage
+    });
 }
 
 async function initIpfs(directory) {
@@ -44,10 +51,10 @@ async function initIpfs(directory) {
   const orbitdb = await OrbitDB.createInstance(ipfs);
 
   // Create / Open a database
-  db = await orbitdb.keyvalue("distribution", { sync: true });
+  db = await orbitdb.docstore("system", { sync: true });
   await db.load();
 
-  console.log(`Orbit: ${db.address.toString()}`);
+  console.log(`System: ${db.address.toString()}`);
 
   // Listen for updates from peers
   db.events.on("replicated", (address) => {
@@ -57,15 +64,12 @@ async function initIpfs(directory) {
   await fs.ensureDir(directory);
 
   const root = path.basename(directory);
-  const stats = await ipfs.files.stat("/");
   const files = await ipfs.files.ls("/");
 
   for await (const file of files) {
     await ipfs.files.rm(`/${file.name}`, { recursive: true });
   }
-
-  console.log(stats.cid.string);
-
+ 
   chokidar.watch(directory).on("add", async (filePath) => {
     const relativeName = path.relative(directory, filePath);
     await upsertFile(root, relativeName, fs.readFileSync(filePath));
