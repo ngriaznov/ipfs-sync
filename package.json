@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "chokidar": "^3.4.2",
+    "ipfs": "^0.50.2"
+  }
+}
