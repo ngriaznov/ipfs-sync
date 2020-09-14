@@ -107,7 +107,7 @@ async function start() {
       await ipfs.files.rm(`/${file.name}`, { recursive: true });
     }
 
-    for await (const filePath of getFiles('.')) {
+    for await (const filePath of getFiles(directory)) {
       const relativeName = path.relative(directory, filePath);
       await addFile(root, relativeName, fs.readFileSync(filePath));
     }
