@@ -101,14 +101,6 @@ async function start() {
     await fs.ensureDir(directory);
 
     const root = path.basename(directory);
-    const files = await ipfs.files.ls("/");
-
-    for await (const file of files) {
-      try {
-        await ipfs.files.rm(`/${file.name}`, { recursive: true });
-      } catch {
-      }
-    }
 
     for await (const f of getFiles(directory)) {
       console.log(f);
