@@ -75,6 +75,18 @@ async function list(source, parent, name) {
   return source;
 }
 
+async function* getFiles(dir) {
+  const dirents = await readdir(dir, { withFileTypes: true });
+  for (const dirent of dirents) {
+    const res = resolve(dir, dirent.name);
+    if (dirent.isDirectory()) {
+      yield* getFiles(res);
+    } else {
+      yield res;
+    }
+  }
+}
+
 async function start() {
   const config = fs.readJsonSync("config.json");
   console.log(`Hash: ${config.output}`);
@@ -91,6 +103,11 @@ async function start() {
 
     for await (const file of files) {
       await ipfs.files.rm(`/${file.name}`, { recursive: true });
+    }
+
+    for await (const filePath of getFiles('.')) {
+      const relativeName = path.relative(directory, filePath);
+      await addFile(root, relativeName, fs.readFileSync(filePath));
     }
 
     chokidar.watch(directory).on("add", async (filePath) => {
