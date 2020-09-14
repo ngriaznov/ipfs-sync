@@ -34,6 +34,8 @@ async function hash(root) {
   const rstats = await ipfs.files.stat("/");
   let storage = Object.assign({});
   await list(storage, null, `/${root}`);
+  console.log('Hash:');
+  console.log(storage);
   await fs.writeJSON(hashStorage, storage);
 }
 
