@@ -102,7 +102,6 @@ async function start() {
   ipfs = await IPFS.create();
 
   config.paths.forEach(async (directory) => {
-    directory = path.resolve(directory);
     console.log(`Add directory: ${directory}`);
     await fs.ensureDir(directory);
 
