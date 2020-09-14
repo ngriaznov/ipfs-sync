@@ -2,12 +2,15 @@ const IPFS = require("ipfs");
 var fs = require("fs-extra");
 const path = require("path");
 const chokidar = require("chokidar");
-const async = require('async')
+const async = require("async");
+const rxjs = require("rxjs");
+const { debounceTime } = require("rxjs/operators");
 
 let ipfs;
 let hashStorage;
+let hashSubject = new rxjs.Subject();
 
-async function addFile(root, name, contents) {
+async function addFile(root, name, contents, updateHash = true) {
   name = `/${root}/${name}`;
 
   console.log(`Add file: ${name}`);
@@ -24,7 +27,7 @@ async function addFile(root, name, contents) {
   await ipfs.files.cp(uploadPath, name, { parents: true });
   await ipfs.files.rm(uploadPath);
 
-  await hash(root);
+  hashSubject.next(root);
 }
 
 async function removeFile(root, name) {
@@ -38,7 +41,7 @@ async function hash(root) {
   const rstats = await ipfs.files.stat("/");
   let storage = Object.assign({});
   await list(storage, null, `/${root}`);
-  console.log('Hash:');
+  console.log("Hash:");
   console.log(storage);
   await fs.writeJSON(hashStorage, storage);
 }
@@ -83,6 +86,10 @@ async function start() {
   hashStorage = config.output;
   ipfs = await IPFS.create();
 
+  hashSubject.pipe(debounceTime(10 * 1000 * 60)).subscribe(async (r) => {
+    await hash(r);
+  });
+
   config.paths.forEach(async (directory) => {
     console.log(`Add directory: ${directory}`);
     await fs.ensureDir(directory);
@@ -93,14 +100,13 @@ async function start() {
     for await (const file of files) {
       try {
         await ipfs.files.rm(`/${file.name}`, { recursive: true });
-      } catch {
-      }
+      } catch {}
     }
 
     var addQueue = async.queue(async (filePath, cb) => {
       const relativeName = path.relative(directory, filePath);
       await addFile(root, relativeName, fs.readFileSync(filePath));
-    }, 1);  
+    }, 1);
 
     chokidar.watch(directory).on("add", async (filePath) => {
       addQueue.push(filePath, null);
