@@ -2,8 +2,7 @@ const IPFS = require("ipfs");
 var fs = require("fs-extra");
 const path = require("path");
 const chokidar = require("chokidar");
-const { resolve } = require('path');
-const { readdir } = require('fs').promises;
+const async = require('async')
 
 let ipfs;
 let hashStorage;
@@ -98,9 +97,13 @@ async function start() {
       }
     }
 
-    chokidar.watch(directory).on("add", async (filePath) => {
+    var addQueue = async.queue(async (filePath, cb) => {
       const relativeName = path.relative(directory, filePath);
       await addFile(root, relativeName, fs.readFileSync(filePath));
+    }, 1);  
+
+    chokidar.watch(directory).on("add", async (filePath) => {
+      addQueue.push(filePath, null);
     });
     chokidar.watch(directory).on("unlink", async (filePath) => {
       const relativeName = path.relative(directory, filePath);
