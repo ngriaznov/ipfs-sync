@@ -104,12 +104,16 @@ async function start() {
     const files = await ipfs.files.ls("/");
 
     for await (const file of files) {
-      await ipfs.files.rm(`/${file.name}`, { recursive: true });
+      try {
+        await ipfs.files.rm(`/${file.name}`, { recursive: true });
+      } catch {
+
+      }
     }
 
-    for await (const filePath of getFiles(directory)) {
-      const relativeName = path.relative(directory, filePath);
-      await addFile(root, relativeName, fs.readFileSync(filePath));
+    for await (const f of getFiles(directory)) {
+      const relativeName = path.relative(directory, f);
+      await addFile(root, relativeName, fs.readFileSync(f));
     }
 
     chokidar.watch(directory).on("add", async (filePath) => {
