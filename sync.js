@@ -73,13 +73,13 @@ async function list(source, parent, name) {
 
 async function start() {
   const config = fs.readJsonSync("config.json");
-  console.log(`output: ${config.output}`);
-  console.log(`paths: ${config.paths}`);
-  
+  console.log(`Hash: ${config.output}`);
+
   hashStorage = config.output;
   ipfs = await IPFS.create();
 
   config.paths.forEach(async (directory) => {
+    console.log(`Add directory: ${directory}`);
     await fs.ensureDir(directory);
 
     const root = path.basename(directory);
