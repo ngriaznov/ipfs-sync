@@ -77,23 +77,6 @@ async function list(source, parent, name) {
   return source;
 }
 
-function walk(dir) {
-  var results = [];
-  var list = fs.readdirSync(dir);
-  list.forEach(function(file) {
-      file = dir + '/' + file;
-      var stat = fs.statSync(file);
-      if (stat && stat.isDirectory()) { 
-          /* Recurse into a subdirectory */
-          results = results.concat(walk(file));
-      } else { 
-          /* Is a file */
-          results.push(file);
-      }
-  });
-  return results;
-}
-
 async function start() {
   const config = fs.readJsonSync("config.json");
   console.log(`Hash: ${config.output}`);
@@ -113,12 +96,6 @@ async function start() {
         await ipfs.files.rm(`/${file.name}`, { recursive: true });
       } catch {
       }
-    }
-
-    for (const f of walk(directory)) {
-      console.log(f);
-      const relativeName = path.relative(directory, f);
-      await addFile(root, relativeName, fs.readFileSync(f));
     }
 
     chokidar.watch(directory).on("add", async (filePath) => {
