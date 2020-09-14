@@ -1,14 +1,13 @@
 const IPFS = require("ipfs");
-const OrbitDB = require("orbit-db");
 var fs = require("fs-extra");
 const path = require("path");
 const chokidar = require("chokidar");
-const sleep = require('util').promisify(setTimeout)
+const config = fs.readJsonSync("config.json");
 
 let ipfs;
-let db;
+let hashStorage;
 
-async function upsertFile(root, name, contents) {
+async function addFile(root, name, contents) {
   name = `/${root}/${name}`;
 
   const id = name;
@@ -23,103 +22,81 @@ async function upsertFile(root, name, contents) {
   await ipfs.files.cp(uploadPath, name, { parents: true });
   await ipfs.files.rm(uploadPath);
 
-  await updateRootHash(root);
+  await hash(root);
 }
 
-async function deleteFile(root, name) {
+async function removeFile(root, name) {
   await ipfs.files.rm(name);
-  await updateRootHash(root);
+  await hash(root);
 }
 
-async function updateRootHash(root) {
+async function hash(root) {
   const rstats = await ipfs.files.stat("/");
-  let storage = await db.get('directories');
-  let entries = new Map();
-  
-  if (storage && storage.length > 0) {
-    entries = storage[0].entries;
-  }
-
-  entries.set(root, rstats.cid.string);
-  await db.put({
-    _id: "directories",
-    entries
-  }, { pin: true });
+  let storage = Object.assign({});
+  await list(storage, null, `/${root}`);
+  await fs.writeJSON(hashStorage, storage);
 }
 
-async function initIpfs(directory) {
+async function list(source, parent, name) {
+  const entry = parent ? path.join(parent, name) : name;
 
-  const ipfsOptions = {
-    EXPERIMENTAL: {
-      pubsub: true
-    },
-    repo: 'sync',
-    start: true
+  const rstats = await ipfs.files.stat(entry);
+  source.path = entry;
+  source.cid = rstats.cid.string;
+
+  source.children = [];
+
+  for await (const file of ipfs.files.ls(entry)) {
+    try {
+      let child = Object.assign({});
+      if (file.type == "file") {
+        const cstats = await ipfs.files.stat(path.join(parent, file.name));
+        child.path = path.join(parent, file.name);
+        child.cid = cstats.cid.string;
+      } else {
+        if (!entry.endsWith(file.name)) {
+          child = await list(child, entry, file.name);
+        } else {
+          child = null;
+        }
+      }
+
+      if (child) {
+        source.children.push(child);
+      }
+    } catch {}
   }
 
-  ipfs = await IPFS.create(ipfsOptions);
+  return source;
+}
 
-  // Init Orbit
-  const orbitdb = await OrbitDB.createInstance(ipfs);
-  const publicAccess = false;
+async function start() {
+  hashStorage = config.output;
+  ipfs = await IPFS.create();
 
-  // Create / Open a database
-  db = await orbitdb.docs('system', {
-    create: true, 
-    overwrite: true,
-    localOnly: false,
-    type: 'docstore',
-    accessController: {
-      write: publicAccess ? ['*'] : [orbitdb.identity.id],
+  config.paths.forEach(async (directory) => {
+    await fs.ensureDir(directory);
+
+    const root = path.basename(directory);
+    const files = await ipfs.files.ls("/");
+
+    for await (const file of files) {
+      await ipfs.files.rm(`/${file.name}`, { recursive: true });
     }
-  });
 
-  // Listen for updates from peers
-  db.events.on("replicated", (address) => {
-    console.log(db.iterator({ limit: -1 }).collect());
-  });  
-  await db.load();
-  
-  console.log(`Orbit DB shared on ${db.address.toString()}`);
-  setInterval(async () => {
-    await db.put({ _id: "system", initialized: true });
-  }, 1000);
-
-  return directory;
-}
-
-async function initWatch(directory) {
-
-  await fs.ensureDir(directory);
-
-  const root = path.basename(directory);
-  const files = await ipfs.files.ls("/");
-
-  for await (const file of files) {
-    await ipfs.files.rm(`/${file.name}`, { recursive: true });
-  }
-
-  chokidar.watch(directory).on("add", async (filePath) => {
-    const relativeName = path.relative(directory, filePath);
-    await upsertFile(root, relativeName, fs.readFileSync(filePath));
-  });
-  chokidar.watch(directory).on("unlink", async (filePath) => {
-    const relativeName = path.relative(directory, filePath);
-    await deleteFile(root, relativeName);
-  });
-  chokidar.watch(directory).on("change", async (filePath) => {
-    const relativeName = path.relative(directory, filePath);
-    await upsertFile(root, relativeName, fs.readFileSync(filePath));
+    chokidar.watch(directory).on("add", async (filePath) => {
+      const relativeName = path.relative(directory, filePath);
+      await addFile(root, relativeName, fs.readFileSync(filePath));
+    });
+    chokidar.watch(directory).on("unlink", async (filePath) => {
+      const relativeName = path.relative(directory, filePath);
+      await removeFile(root, relativeName);
+    });
+    chokidar.watch(directory).on("change", async (filePath) => {
+      const relativeName = path.relative(directory, filePath);
+      await addFile(root, relativeName, fs.readFileSync(filePath));
+    });
   });
 }
 
-const args = process.argv.slice(2);
-
-if (args.length == 0) {
-  console.log("Usage: ipfs-sync folder");
-  process.exit();
-}
-
-const folder = args[0];
-
-initIpfs(folder).then(d => initWatch(d));
+start();

@@ -12,7 +12,7 @@
                 "<node_internals>/**"
             ],
             "program": "${workspaceFolder}/sync.js",
-            "args": ["test"]
+            "args": ["-i", "test", "-o", "hash.json"]
         }
     ]
 }
