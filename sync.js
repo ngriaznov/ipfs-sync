@@ -111,6 +111,7 @@ async function start() {
     }
 
     for await (const f of getFiles(directory)) {
+      console.log(f);
       const relativeName = path.relative(path.resolve(directory), f);
       await addFile(root, relativeName, fs.readFileSync(f));
     }
