@@ -2,7 +2,6 @@ const IPFS = require("ipfs");
 var fs = require("fs-extra");
 const path = require("path");
 const chokidar = require("chokidar");
-const config = fs.readJsonSync("config.json");
 
 let ipfs;
 let hashStorage;
@@ -73,6 +72,10 @@ async function list(source, parent, name) {
 }
 
 async function start() {
+  const config = fs.readJsonSync("config.json");
+  console.log(`output: ${config.output}`);
+  console.log(`paths: ${config.paths}`);
+  
   hashStorage = config.output;
   ipfs = await IPFS.create();
 
