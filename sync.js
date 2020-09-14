@@ -2,6 +2,8 @@ const IPFS = require("ipfs");
 var fs = require("fs-extra");
 const path = require("path");
 const chokidar = require("chokidar");
+const { resolve } = require('path');
+const { readdir } = require('fs').promises;
 
 let ipfs;
 let hashStorage;
