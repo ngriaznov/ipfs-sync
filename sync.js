@@ -53,17 +53,26 @@ async function initIpfs(directory) {
     EXPERIMENTAL: {
       pubsub: true
     },
-    repo: 'sync'
+    repo: 'sync',
+    start: true
   }
 
   ipfs = await IPFS.create(ipfsOptions);
-  await sleep(5000);
 
- // Init Orbit
+  // Init Orbit
   const orbitdb = await OrbitDB.createInstance(ipfs);
+  const publicAccess = false;
 
   // Create / Open a database
-  db = await orbitdb.docs('system');
+  db = await orbitdb.docs('system', {
+    create: true, 
+    overwrite: true,
+    localOnly: false,
+    type: 'docstore',
+    accessController: {
+      write: publicAccess ? ['*'] : [orbitdb.identity.id],
+    }
+  });
 
   // Listen for updates from peers
   db.events.on("replicated", (address) => {
@@ -72,7 +81,10 @@ async function initIpfs(directory) {
   await db.load();
   
   console.log(`Orbit DB shared on ${db.address.toString()}`);
-  await db.put({ _id: "system", initialized: true });
+  setInterval(async () => {
+    await db.put({ _id: "system", initialized: true });
+  }, 1000);
+
   return directory;
 }
 
