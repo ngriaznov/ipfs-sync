@@ -9,6 +9,8 @@ let hashStorage;
 async function addFile(root, name, contents) {
   name = `/${root}/${name}`;
 
+  console.log(`Add file: ${name}`);
+
   const id = name;
   const uploadPath = `/upload/${id}`;
 
@@ -25,6 +27,8 @@ async function addFile(root, name, contents) {
 }
 
 async function removeFile(root, name) {
+  console.log(`Remove file: ${name}`);
+
   await ipfs.files.rm(name);
   await hash(root);
 }
