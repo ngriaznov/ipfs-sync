@@ -77,16 +77,21 @@ async function list(source, parent, name) {
   return source;
 }
 
-async function* getFiles(dir) {
-  const dirents = await readdir(dir, { withFileTypes: true });
-  for (const dirent of dirents) {
-    const res = resolve(dir, dirent.name);
-    if (dirent.isDirectory()) {
-      yield* getFiles(res);
-    } else {
-      yield res;
-    }
-  }
+function walk(dir) {
+  var results = [];
+  var list = fs.readdirSync(dir);
+  list.forEach(function(file) {
+      file = dir + '/' + file;
+      var stat = fs.statSync(file);
+      if (stat && stat.isDirectory()) { 
+          /* Recurse into a subdirectory */
+          results = results.concat(walk(file));
+      } else { 
+          /* Is a file */
+          results.push(file);
+      }
+  });
+  return results;
 }
 
 async function start() {
@@ -101,10 +106,18 @@ async function start() {
     await fs.ensureDir(directory);
 
     const root = path.basename(directory);
+    const files = await ipfs.files.ls("/");
 
-    for await (const f of getFiles(directory)) {
+    for await (const file of files) {
+      try {
+        await ipfs.files.rm(`/${file.name}`, { recursive: true });
+      } catch {
+      }
+    }
+
+    for (const f of walk(directory)) {
       console.log(f);
-      const relativeName = path.relative(path.resolve(directory), f);
+      const relativeName = path.relative(directory, f);
       await addFile(root, relativeName, fs.readFileSync(f));
     }
 
